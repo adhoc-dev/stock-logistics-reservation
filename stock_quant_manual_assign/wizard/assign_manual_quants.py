@@ -62,7 +62,13 @@ class AssignManualQuants(models.TransientModel):
 
     def assign_quants(self):
         move = self.move_id
-        move._do_unreserve()
+        # Odoo 18's _do_unreserve() skips moves where move.picked=True (set
+        # when any move_line has picked=True, e.g. after barcode processing),
+        # leaving the existing reservation intact and adding a second move_line
+        # that doubles the quantity. Unlinking move_lines directly bypasses
+        # that check while still calling stock.quant._update_reserved_quantity
+        # to unreserve — the same path taken internally by _do_unreserve.
+        move.move_line_ids.unlink()
         for line in self.quants_lines:
             line._assign_quant_line()
         move._recompute_state()
